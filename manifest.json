@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT Protocol Login",
+  "version": "0.1.0",
+  "description": "在当前浏览器环境中通过同源协议请求登录 ChatGPT。",
+  "minimum_chrome_version": "102",
+  "permissions": [
+    "alarms",
+    "cookies",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://www.chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://auth.openai.com/*",
+    "https://auth0.openai.com/*",
+    "https://accounts.openai.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://www.chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://auth.openai.com/*",
+        "https://auth0.openai.com/*",
+        "https://accounts.openai.com/*"
+      ],
+      "js": [
+        "shared/protocol.js",
+        "shared/totp.js",
+        "content/protocol-bridge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "ChatGPT Protocol Login",
+    "default_popup": "popup/popup.html"
+  }
+}

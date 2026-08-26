@@ -1,0 +1,326 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f7f6;
+  --surface: #ffffff;
+  --text: #17201c;
+  --muted: #66736d;
+  --border: #d8dfdb;
+  --accent: #18794e;
+  --accent-hover: #11653f;
+  --danger: #b42318;
+  --warning: #9a6700;
+  --focus: #0b6bcb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 420px;
+  min-height: 520px;
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+textarea,
+input {
+  font: inherit;
+  letter-spacing: 0;
+}
+
+button:focus-visible,
+textarea:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  padding: 16px;
+}
+
+.app-header,
+.toolbar,
+.panel-actions,
+.section-heading,
+.account-row,
+.task-panel {
+  display: flex;
+  align-items: center;
+}
+
+.app-header {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: 13px;
+}
+
+.count-badge,
+.status-mark {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 22px;
+  min-width: 24px;
+  padding: 0 7px;
+  text-align: center;
+}
+
+.toolbar {
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.button {
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.button-primary {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.button-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.button-quiet {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.button-danger {
+  border-color: #efc5c1;
+  background: #fff7f6;
+  color: var(--danger);
+}
+
+.task-panel,
+.import-panel {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.task-panel {
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+}
+
+.task-copy {
+  min-width: 0;
+}
+
+.task-copy strong,
+.task-copy p {
+  display: block;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.task-copy p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.task-panel[data-status="success"] .status-mark {
+  border-color: #a9d5bd;
+  color: var(--accent);
+}
+
+.task-panel[data-status="error"] .status-mark,
+.task-panel[data-status="canceled"] .status-mark {
+  border-color: #efc5c1;
+  color: var(--danger);
+}
+
+.import-panel {
+  padding: 12px;
+}
+
+.import-panel label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 9px;
+  background: #fbfcfb;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.search-field {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.search-field input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 7px 10px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.file-row {
+  margin-top: 8px;
+}
+
+input[type="file"] {
+  max-width: 100%;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.panel-actions {
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.import-errors {
+  max-height: 72px;
+  margin-top: 8px;
+  overflow-y: auto;
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.section-heading {
+  min-height: 30px;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#global-message {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-list {
+  display: grid;
+  gap: 8px;
+  max-height: 390px;
+  margin: 0;
+  padding: 0 1px 2px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.account-row {
+  min-height: 66px;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.account-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-email {
+  display: block;
+  overflow-wrap: anywhere;
+  font-weight: 650;
+}
+
+.account-meta {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.account-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.account-actions .button {
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.empty-state {
+  padding: 54px 16px;
+  border: 1px dashed #bfc9c4;
+  border-radius: 6px;
+  color: var(--muted);
+  text-align: center;
+}
+
+[hidden] {
+  display: none !important;
+}
