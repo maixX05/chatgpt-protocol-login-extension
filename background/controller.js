@@ -135,9 +135,12 @@
     async function clearAccounts() {
       const task = await getTask();
       if (task && !TERMINAL_STATUSES.has(task.status)) {
-        throw new Error('协议登录运行中，不能清空账号');
+        throw new Error('协议登录运行中，不能清除导入数据');
       }
-      await setAccounts([]);
+      await chromeApi.alarms?.clear?.(TIMEOUT_ALARM);
+      await chromeApi.storage.session.remove([ACCOUNTS_KEY, TASK_KEY]);
+      await chromeApi.action?.setBadgeText?.({ text: '' });
+      chromeApi.runtime?.sendMessage?.({ type: 'state:changed' }).catch?.(() => {});
       return publicState();
     }
 
@@ -211,11 +214,10 @@
         finishedAt: now(),
       });
       if (next.status === 'success') {
-        await patchAccount(next.email, {
-          status: 'success',
-          statusMessage: next.message,
-          lastLoginAt: now(),
-        });
+        // Credentials are single-use in this extension and must not remain after login succeeds.
+        await deleteAccount(next.email);
+        await chromeApi.storage.session.remove([TASK_KEY]);
+        chromeApi.runtime?.sendMessage?.({ type: 'state:changed' }).catch?.(() => {});
         await chromeApi.action?.setBadgeText?.({ text: 'OK' });
         await chromeApi.action?.setBadgeBackgroundColor?.({ color: '#18794e' });
       } else {
@@ -249,15 +251,24 @@
         throw new Error('账号缺少密码或 2FA 密钥');
       }
 
-      const createProperties = { url: 'about:blank', active: true };
-      if (Number.isInteger(Number(options.windowId))) createProperties.windowId = Number(options.windowId);
-      const tab = await chromeApi.tabs.create(createProperties);
+      const requestedTabId = Number(options.tabId);
+      const useCurrentTab = Number.isInteger(requestedTabId);
+      let tab;
+      if (useCurrentTab) {
+        tab = await chromeApi.tabs.get(requestedTabId).catch(() => null);
+        if (!tab) throw new Error('当前标签页已不存在');
+      } else {
+        const createProperties = { url: 'about:blank', active: true };
+        if (Number.isInteger(Number(options.windowId))) createProperties.windowId = Number(options.windowId);
+        tab = await chromeApi.tabs.create(createProperties);
+      }
       const storeId = await cookieStoreIdForTab(tab.id);
       const createdAt = now();
       let task = {
         taskId: taskId(),
         email: normalized,
         tabId: tab.id,
+        createdTab: !useCurrentTab,
         storeId: storeId || null,
         status: 'running',
         stage: 'clearing_session',
@@ -396,7 +407,9 @@
         stage: 'canceled',
         message: '已停止登录',
       });
-      await chromeApi.tabs.remove(task.tabId).catch(() => {});
+      if (task.createdTab) {
+        await chromeApi.tabs.remove(task.tabId).catch(() => {});
+      }
       return publicState();
     }
 
@@ -429,7 +442,10 @@
       if (message.type === 'accounts:delete') return { state: await deleteAccount(message.email) };
       if (message.type === 'accounts:clear') return { state: await clearAccounts() };
       if (message.type === 'login:start') {
-        const task = await startLogin(message.email, { windowId: message.windowId ?? sender?.tab?.windowId });
+        const task = await startLogin(message.email, {
+          tabId: message.tabId ?? sender?.tab?.id,
+          windowId: message.windowId ?? sender?.tab?.windowId,
+        });
         return { task, state: await publicState() };
       }
       if (message.type === 'login:cancel') return { state: await cancelLogin() };

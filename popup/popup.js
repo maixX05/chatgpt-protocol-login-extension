@@ -111,7 +111,7 @@ function render(state) {
   renderAccounts(currentState.accounts || [], currentState.task);
   renderTask(currentState.task);
   const running = taskRunning(currentState.task);
-  elements.clearAccounts.disabled = running || !(currentState.accounts || []).length;
+  elements.clearAccounts.disabled = running || (!(currentState.accounts || []).length && !currentState.task);
   elements.showImport.disabled = running;
 }
 
@@ -133,19 +133,27 @@ async function refresh() {
   }
 }
 
-async function currentWindowId() {
+async function currentTabContext() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  return Number.isInteger(tabs?.[0]?.windowId) ? tabs[0].windowId : undefined;
+  const tab = tabs?.[0];
+  if (!Number.isInteger(tab?.id)) {
+    throw new Error('无法获取当前标签页');
+  }
+  return {
+    tabId: tab.id,
+    windowId: Number.isInteger(tab.windowId) ? tab.windowId : undefined,
+  };
 }
 
 async function startLogin(email) {
   if (!confirm(`将清理当前 ChatGPT 登录态并登录 ${email}，是否继续？`)) return;
   setMessage('正在启动登录...');
   try {
+    const tab = await currentTabContext();
     const response = await send({
       type: 'login:start',
       email,
-      windowId: await currentWindowId(),
+      ...tab,
     });
     render(response.state);
     window.close();
@@ -218,11 +226,17 @@ elements.accountSearch.addEventListener('input', () => {
 });
 
 elements.clearAccounts.addEventListener('click', async () => {
-  if (!confirm('确认清空当前浏览器会话中的全部账号？')) return;
+  if (!confirm('将删除插件中导入的邮箱、密码、2FA 密钥和任务记录。\n\n不会清除 ChatGPT Cookie 或退出当前登录。是否继续？')) return;
   try {
     const response = await send({ type: 'accounts:clear' });
+    elements.accountText.value = '';
+    elements.accountFile.value = '';
+    elements.accountSearch.value = '';
+    elements.importErrors.textContent = '';
+    elements.importErrors.hidden = true;
+    elements.importPanel.hidden = true;
     render(response.state);
-    setMessage('账号已清空');
+    setMessage('导入数据已清除，ChatGPT 登录态未改变');
   } catch (error) {
     setMessage(error.message, true);
   }

@@ -18,3 +18,11 @@ test('manifest references existing least-privilege extension resources', () => {
     }
   }
 });
+
+test('popup exposes an explicit imported-data cleanup action', () => {
+  const popupHtml = fs.readFileSync(path.join(pluginRoot, 'popup/popup.html'), 'utf8');
+  const popupScript = fs.readFileSync(path.join(pluginRoot, 'popup/popup.js'), 'utf8');
+  assert.match(popupHtml, /id="clear-accounts"[^>]*>清除导入数据<\/button>/);
+  assert.match(popupScript, /不会清除 ChatGPT Cookie/);
+  assert.match(popupScript, /tabId: tab\.id/);
+});
