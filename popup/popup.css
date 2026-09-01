@@ -321,6 +321,15 @@ input[type="file"] {
   text-align: center;
 }
 
+.app-footer {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
 [hidden] {
   display: none !important;
 }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Protocol Login",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "在当前浏览器环境中通过同源协议请求登录 ChatGPT。",
   "minimum_chrome_version": "102",
   "permissions": [

@@ -26,3 +26,13 @@ test('popup exposes an explicit imported-data cleanup action', () => {
   assert.match(popupScript, /不会清除 ChatGPT Cookie/);
   assert.match(popupScript, /tabId: tab\.id/);
 });
+
+test('popup footer shows the release version and author credit', () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'manifest.json'), 'utf8'));
+  const packageJson = JSON.parse(fs.readFileSync(path.join(pluginRoot, 'package.json'), 'utf8'));
+  const popupHtml = fs.readFileSync(path.join(pluginRoot, 'popup/popup.html'), 'utf8');
+
+  assert.equal(manifest.version, '1.0.0');
+  assert.equal(packageJson.version, manifest.version);
+  assert.match(popupHtml, /v1\.0\.0 · Built by MaixXx/);
+});
