@@ -43,6 +43,7 @@ test('begins login through same-origin ChatGPT endpoints', async () => {
 
 test('verifies password, TOTP and workspace before returning the callback', async () => {
   const requests = [];
+  const progress = [];
   const responses = [
     jsonResponse(200, {
       page: { type: 'mfa_challenge' },
@@ -62,6 +63,7 @@ test('verifies password, TOTP and workspace before returning the callback', asyn
     now: () => 5_000,
     locationImpl: new URL('https://auth.openai.com/log-in/password'),
     protocol,
+    reportProgress: async (entry) => progress.push(entry),
     totp,
     fetchImpl: async (url, options) => {
       requests.push({ url, options });
@@ -70,12 +72,24 @@ test('verifies password, TOTP and workspace before returning the callback', asyn
   });
 
   const result = await bridge.authenticate({
+    taskId: 'task-1',
     password: 'Password',
     totpSecret: 'JBSWY3DPEHPK3PXP',
   });
 
   assert.equal(result.continueUrl, 'https://auth.openai.com/authorize/resume');
   assert.equal(result.mfaVerified, true);
+  assert.deepEqual(progress.map((entry) => entry.stage), [
+    'password_verifying',
+    'password_verified',
+    'totp_challenge',
+    'totp_verified',
+    'workspace_selecting',
+    'workspace_selected',
+    'authorization_ready',
+  ]);
+  assert.equal(JSON.stringify(progress).includes('Password'), false);
+  assert.equal(JSON.stringify(progress).includes('JBSWY3DPEHPK3PXP'), false);
   assert.deepEqual(requests.map((item) => new URL(item.url).pathname), [
     '/api/accounts/password/verify',
     '/api/accounts/mfa/issue_challenge',

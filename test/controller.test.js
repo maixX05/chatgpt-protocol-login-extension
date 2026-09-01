@@ -99,10 +99,18 @@ test('orchestrates ChatGPT, auth and callback stages without returning credentia
   });
 
   const state = await controller.publicState();
-  assert.equal(state.task, null);
+  assert.equal(state.task.status, 'success');
+  assert.equal(state.task.stage, 'completed');
+  assert.deepEqual(state.task.logs.map((entry) => entry.stage), [
+    'clearing_session',
+    'opening_chatgpt',
+    'opening_auth',
+    'authenticating',
+    'finishing_callback',
+    'completed',
+  ]);
   assert.deepEqual(state.accounts, []);
   assert.equal(JSON.stringify(state).includes('JBSWY3DPEHPK3PXP'), false);
-  assert.equal(JSON.stringify(mock.storage).includes('user@example.com'), false);
   assert.equal(JSON.stringify(mock.storage).includes('JBSWY3DPEHPK3PXP'), false);
   assert.equal(JSON.stringify(mock.storage).includes('Password'), false);
   assert.equal(mock.messages[1].password, 'Password');
@@ -195,4 +203,65 @@ test('does not replay credentials after an explicit protocol rejection', async (
   assert.equal(state.task.status, 'error');
   assert.equal(state.task.errorCode, 'credentials_rejected');
   assert.equal(mock.messages.filter((message) => message.type === 'protocol:authenticate').length, 1);
+});
+
+test('records allow-listed progress from the active login tab without accepting arbitrary log text', async () => {
+  const mock = createChromeMock();
+  const controller = createLoginController({
+    accountsModule,
+    chrome: mock.chrome,
+    now: () => 10_000,
+    protocol,
+  });
+  await controller.importAccounts('user@example.com----Password----JBSWY3DPEHPK3PXP');
+  const task = await controller.startLogin('user@example.com');
+
+  await controller.recordProgress({
+    taskId: task.taskId,
+    stage: 'password_verified',
+    message: 'Password JBSWY3DPEHPK3PXP',
+  }, { tab: { id: task.tabId } });
+
+  const state = await controller.publicState();
+  assert.equal(state.task.stage, 'password_verified');
+  assert.equal(state.task.message, '账号密码验证通过');
+  assert.equal(mock.storage.chatGptProtocolLoginTask.stage, 'opening_chatgpt');
+  assert.equal(mock.storage.chatGptProtocolLoginTask.progressStage, 'password_verified');
+  assert.equal(JSON.stringify(state.task.logs).includes('JBSWY3DPEHPK3PXP'), false);
+  await assert.rejects(
+    controller.recordProgress({ taskId: task.taskId, stage: 'totp_verified' }, { tab: { id: 999 } }),
+    /来源标签页不匹配/
+  );
+  await assert.rejects(
+    controller.recordProgress({ taskId: task.taskId, stage: 'custom_log' }, { tab: { id: task.tabId } }),
+    /未知的登录进度阶段/
+  );
+
+  const cleared = await controller.clearTaskLogs();
+  assert.deepEqual(cleared.task.logs, []);
+  assert.equal(cleared.task.stage, 'password_verified');
+});
+
+test('caps persisted task logs at 200 entries', async () => {
+  const mock = createChromeMock();
+  let timestamp = 20_000;
+  const controller = createLoginController({
+    accountsModule,
+    chrome: mock.chrome,
+    now: () => timestamp += 1,
+    protocol,
+  });
+  await controller.importAccounts('user@example.com----Password----JBSWY3DPEHPK3PXP');
+  const task = await controller.startLogin('user@example.com');
+
+  for (let index = 0; index < 205; index += 1) {
+    await controller.recordProgress({
+      taskId: task.taskId,
+      stage: index % 2 ? 'password_verified' : 'password_verifying',
+    }, { tab: { id: task.tabId } });
+  }
+
+  const state = await controller.publicState();
+  assert.equal(state.task.logs.length, 200);
+  assert.equal(mock.storage.chatGptProtocolLoginTask.logs.length, 200);
 });

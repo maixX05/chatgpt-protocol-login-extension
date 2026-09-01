@@ -11,6 +11,7 @@
   const TASK_KEY = 'chatGptProtocolLoginTask';
   const TIMEOUT_ALARM = 'chatGptProtocolLoginTimeout';
   const LOGIN_TIMEOUT_MS = 3 * 60 * 1000;
+  const MAX_TASK_LOGS = 200;
   const CHATGPT_URL = 'https://chatgpt.com/';
   const COOKIE_ORIGINS = Object.freeze([
     'https://chatgpt.com',
@@ -21,6 +22,17 @@
     'https://accounts.openai.com',
   ]);
   const TERMINAL_STATUSES = new Set(['success', 'error', 'canceled']);
+  const PROGRESS_STAGES = Object.freeze({
+    password_verifying: { message: '正在验证账号密码', level: 'info' },
+    password_verified: { message: '账号密码验证通过', level: 'success' },
+    totp_challenge: { message: '正在验证 2FA 动态码', level: 'info' },
+    totp_verified: { message: '2FA 动态码验证通过', level: 'success' },
+    totp_skipped: { message: '本次登录未要求 2FA 验证', level: 'info' },
+    workspace_selecting: { message: '正在选择 ChatGPT 工作空间', level: 'info' },
+    workspace_selected: { message: 'ChatGPT 工作空间选择完成', level: 'success' },
+    workspace_skipped: { message: '本次登录无需选择工作空间', level: 'info' },
+    authorization_ready: { message: 'OpenAI 认证完成，准备登录回调', level: 'success' },
+  });
 
   function createLoginController(deps = {}) {
     const {
@@ -37,6 +49,43 @@
 
     function taskId() {
       return cryptoImpl?.randomUUID?.() || `${now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    function withTaskLog(task, updates = {}, level = 'info', timestamp = now(), logStage = '') {
+      const stage = String(updates.stage || task?.stage || 'unknown').trim() || 'unknown';
+      const progressStage = String(
+        updates.progressStage
+        || updates.stage
+        || task?.progressStage
+        || stage
+      ).trim() || stage;
+      const entryStage = String(logStage || progressStage).trim() || progressStage;
+      const message = String(updates.message || task?.message || '').trim().slice(0, 500);
+      const logs = Array.isArray(task?.logs) ? [...task.logs] : [];
+      const previous = logs[logs.length - 1];
+      if (message && (
+        previous?.stage !== entryStage
+        || previous?.message !== message
+        || previous?.level !== level
+      )) {
+        logs.push({ stage: entryStage, message, level, timestamp });
+      }
+      if (logs.length > MAX_TASK_LOGS) {
+        logs.splice(0, logs.length - MAX_TASK_LOGS);
+      }
+      return {
+        ...task,
+        ...updates,
+        stage,
+        progressStage,
+        message,
+        logs,
+        updatedAt: timestamp,
+      };
+    }
+
+    async function transitionTask(task, updates = {}, level = 'info', logStage = '') {
+      return setTask(withTaskLog(task, updates, level, now(), logStage));
     }
 
     async function readStorage() {
@@ -72,12 +121,18 @@
           taskId: task.taskId,
           email: task.email,
           status: task.status,
-          stage: task.stage,
+          stage: task.progressStage || task.stage,
           message: task.message,
           errorCode: task.errorCode || null,
           loggedInEmail: task.loggedInEmail || null,
           mfaVerified: Boolean(task.mfaVerified),
           removedCookies: Number(task.removedCookies || 0),
+          logs: (Array.isArray(task.logs) ? task.logs : []).slice(-MAX_TASK_LOGS).map((entry) => ({
+            stage: String(entry?.stage || ''),
+            message: String(entry?.message || ''),
+            level: String(entry?.level || 'info'),
+            timestamp: Number(entry?.timestamp || 0),
+          })),
           createdAt: task.createdAt,
           updatedAt: task.updatedAt,
           finishedAt: task.finishedAt || null,
@@ -207,16 +262,17 @@
 
     async function finishTask(task, updates) {
       await chromeApi.alarms?.clear?.(TIMEOUT_ALARM);
-      const next = await setTask({
-        ...task,
+      const finishedAt = now();
+      const level = updates.status === 'success'
+        ? 'success'
+        : (updates.status === 'canceled' ? 'warning' : 'error');
+      const next = await setTask(withTaskLog(task, {
         ...updates,
-        updatedAt: now(),
-        finishedAt: now(),
-      });
+        finishedAt,
+      }, level, finishedAt));
       if (next.status === 'success') {
         // Credentials are single-use in this extension and must not remain after login succeeds.
         await deleteAccount(next.email);
-        await chromeApi.storage.session.remove([TASK_KEY]);
         chromeApi.runtime?.sendMessage?.({ type: 'state:changed' }).catch?.(() => {});
         await chromeApi.action?.setBadgeText?.({ text: 'OK' });
         await chromeApi.action?.setBadgeBackgroundColor?.({ color: '#18794e' });
@@ -272,7 +328,14 @@
         storeId: storeId || null,
         status: 'running',
         stage: 'clearing_session',
+        progressStage: 'clearing_session',
         message: '正在清理当前 ChatGPT 登录态',
+        logs: [{
+          stage: 'clearing_session',
+          message: '正在清理当前 ChatGPT 登录态',
+          level: 'info',
+          timestamp: createdAt,
+        }],
         deviceId: taskId(),
         createdAt,
         updatedAt: createdAt,
@@ -282,12 +345,10 @@
       await patchAccount(normalized, { status: 'running', statusMessage: task.message });
       try {
         const removedCookies = await clearLoginCookies(storeId);
-        task = await setTask({
-          ...task,
+        task = await transitionTask(task, {
           removedCookies,
           stage: 'opening_chatgpt',
           message: '正在建立 ChatGPT 同源登录会话',
-          updatedAt: now(),
         });
         await chromeApi.alarms?.create?.(TIMEOUT_ALARM, { when: task.deadlineAt });
         await chromeApi.tabs.update(tab.id, { url: CHATGPT_URL, active: true });
@@ -326,11 +387,9 @@
             email: account.email,
             deviceId: task.deviceId,
           });
-          task = await setTask({
-            ...task,
+          task = await transitionTask(task, {
             stage: 'opening_auth',
             message: '正在进入 OpenAI 密码认证',
-            updatedAt: now(),
           });
           await chromeApi.tabs.update(tabId, { url: result.authUrl });
           return;
@@ -338,23 +397,21 @@
 
         if (task.stage === 'opening_auth') {
           if (hostKind !== 'auth') return;
-          task = await setTask({
-            ...task,
+          task = await transitionTask(task, {
             stage: 'authenticating',
             message: '正在验证密码和 2FA',
-            updatedAt: now(),
           });
           const result = await bridge(tabId, {
             type: 'protocol:authenticate',
+            taskId: task.taskId,
             password: account.password,
             totpSecret: account.totpSecret,
           });
-          task = await setTask({
-            ...task,
+          task = await getTask() || task;
+          task = await transitionTask(task, {
             stage: 'finishing_callback',
             message: '正在完成 ChatGPT 登录回调',
             mfaVerified: Boolean(result.mfaVerified),
-            updatedAt: now(),
           });
           await chromeApi.tabs.update(tabId, { url: result.continueUrl });
           return;
@@ -413,6 +470,34 @@
       return publicState();
     }
 
+    async function clearTaskLogs() {
+      const task = await getTask();
+      if (!task) return publicState();
+      await setTask({ ...task, logs: [] });
+      return publicState();
+    }
+
+    async function recordProgress(message = {}, sender = {}) {
+      const task = await getTask();
+      if (!task || TERMINAL_STATUSES.has(task.status)) return publicState();
+      if (String(message.taskId || '') !== String(task.taskId || '')) {
+        throw new Error('登录进度不属于当前任务');
+      }
+      if (!Number.isInteger(sender?.tab?.id) || sender.tab.id !== task.tabId) {
+        throw new Error('登录进度来源标签页不匹配');
+      }
+      const stage = String(message.stage || '').trim();
+      const progress = PROGRESS_STAGES[stage];
+      if (!progress) {
+        throw new Error('未知的登录进度阶段');
+      }
+      await transitionTask(task, {
+        progressStage: stage,
+        message: progress.message,
+      }, progress.level, stage);
+      return publicState();
+    }
+
     async function handleAlarm(alarm) {
       if (alarm?.name !== TIMEOUT_ALARM) return;
       const task = await getTask();
@@ -449,6 +534,10 @@
         return { task, state: await publicState() };
       }
       if (message.type === 'login:cancel') return { state: await cancelLogin() };
+      if (message.type === 'login:logs:clear') return { state: await clearTaskLogs() };
+      if (message.type === 'login:progress') {
+        return { state: await recordProgress(message, sender) };
+      }
       throw new Error('未知的插件命令');
     }
 
@@ -457,6 +546,7 @@
       cancelLogin,
       clearAccounts,
       clearLoginCookies,
+      clearTaskLogs,
       deleteAccount,
       handleAlarm,
       handleMessage,
@@ -464,6 +554,7 @@
       handleTabUpdated,
       importAccounts,
       publicState,
+      recordProgress,
       resume,
       startLogin,
     };
@@ -474,6 +565,8 @@
     CHATGPT_URL,
     COOKIE_ORIGINS,
     LOGIN_TIMEOUT_MS,
+    MAX_TASK_LOGS,
+    PROGRESS_STAGES,
     TASK_KEY,
     TIMEOUT_ALARM,
     createLoginController,

@@ -11,6 +11,10 @@ const controller = self.ChatGPTLoginController.createLoginController({
   protocol: self.ChatGPTLoginProtocol,
 });
 
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => {
+  console.error('Failed to configure ChatGPT Protocol Login side panel:', error);
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (![
     'state:get',
@@ -19,6 +23,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     'accounts:clear',
     'login:start',
     'login:cancel',
+    'login:logs:clear',
+    'login:progress',
   ].includes(String(message?.type || ''))) {
     return false;
   }

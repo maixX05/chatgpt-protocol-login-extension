@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatGPT Protocol Login</title>
+    <link rel="stylesheet" href="sidepanel.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="brand">
+          <img src="../icons/icon32.png" width="32" height="32" alt="">
+          <div>
+            <p class="eyebrow">PROTOCOL LOGIN</p>
+            <h1>ChatGPT 账号</h1>
+          </div>
+        </div>
+        <span id="account-count" class="count-badge" aria-label="账号数量">0</span>
+      </header>
+
+      <nav class="view-tabs" role="tablist" aria-label="插件视图">
+        <button id="run-tab" class="view-tab" type="button" role="tab" aria-controls="run-view" aria-selected="false">
+          运行
+        </button>
+        <button id="accounts-tab" class="view-tab" type="button" role="tab" aria-controls="accounts-view" aria-selected="true">
+          账号
+        </button>
+      </nav>
+
+      <div id="global-message" class="global-message" role="status" aria-live="polite"></div>
+
+      <section id="run-view" class="view-panel" role="tabpanel" aria-labelledby="run-tab" hidden>
+        <div id="task-empty" class="run-empty">
+          <strong>暂无登录任务</strong>
+          <button id="open-accounts" class="button button-primary" type="button">选择账号</button>
+        </div>
+
+        <section id="task-panel" class="task-panel" aria-live="polite" hidden>
+          <div class="task-heading">
+            <span id="task-status" class="status-mark">运行中</span>
+            <button id="cancel-login" class="button button-danger button-small" type="button">停止</button>
+          </div>
+          <strong id="task-email" class="task-email"></strong>
+          <p id="task-message" class="task-message"></p>
+          <time id="task-updated" class="task-updated"></time>
+        </section>
+
+        <section id="steps-section" class="steps-section" aria-labelledby="steps-title" hidden>
+          <div class="section-heading">
+            <h2 id="steps-title">登录进度</h2>
+            <span id="steps-progress" class="section-meta">0 / 6</span>
+          </div>
+          <ol id="step-list" class="step-list"></ol>
+        </section>
+
+        <section id="logs-section" class="logs-section" aria-labelledby="logs-title" hidden>
+          <div class="section-heading">
+            <h2 id="logs-title">步骤日志</h2>
+            <div class="section-actions">
+              <span id="log-count" class="section-meta">0 条</span>
+              <button id="clear-logs" class="text-action" type="button">清空</button>
+            </div>
+          </div>
+          <div id="log-list" class="log-list" role="log" aria-live="polite" aria-relevant="additions text"></div>
+        </section>
+      </section>
+
+      <section id="accounts-view" class="view-panel" role="tabpanel" aria-labelledby="accounts-tab">
+        <div class="toolbar">
+          <button id="show-import" class="button button-primary" type="button">导入账号</button>
+          <button id="clear-accounts" class="button button-danger" type="button">清除导入数据</button>
+        </div>
+
+        <section id="import-panel" class="import-panel" aria-labelledby="import-title" hidden>
+          <h2 id="import-title">导入账号</h2>
+          <label for="account-text">邮箱----密码----2FA</label>
+          <textarea id="account-text" rows="7" spellcheck="false" autocomplete="off"></textarea>
+          <div class="file-row">
+            <input id="account-file" type="file" accept=".txt,text/plain">
+          </div>
+          <div id="import-errors" class="import-errors" role="alert" hidden></div>
+          <div class="panel-actions">
+            <button id="hide-import" class="button button-quiet" type="button">取消</button>
+            <button id="import-accounts" class="button button-primary" type="button">确认导入</button>
+          </div>
+        </section>
+
+        <label class="search-field" for="account-search">
+          <span class="visually-hidden">搜索邮箱</span>
+          <input id="account-search" type="search" placeholder="搜索邮箱" autocomplete="off">
+        </label>
+
+        <section aria-labelledby="account-list-title">
+          <div class="section-heading account-list-heading">
+            <h2 id="account-list-title">账号列表</h2>
+          </div>
+          <div id="empty-state" class="empty-state">
+            <strong>暂无账号</strong>
+          </div>
+          <ul id="account-list" class="account-list" aria-label="ChatGPT 账号"></ul>
+        </section>
+      </section>
+
+      <footer class="app-footer" aria-label="版本与作者信息">
+        v1.1.0 · Built by MaixXx
+      </footer>
+    </main>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

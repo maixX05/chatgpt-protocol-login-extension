@@ -13,6 +13,9 @@
       fetchImpl: root.fetch.bind(root),
       locationImpl: root.location,
       protocol: root.ChatGPTLoginProtocol,
+      reportProgress: async (progress) => {
+        await root.chrome.runtime.sendMessage({ type: 'login:progress', ...progress }).catch(() => {});
+      },
       totp: root.ChatGPTLoginTotp,
     });
     root.chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -46,6 +49,7 @@
       locationImpl = globalThis.location,
       now = () => Date.now(),
       protocol = globalThis.ChatGPTLoginProtocol,
+      reportProgress = async () => {},
       totp = globalThis.ChatGPTLoginTotp,
     } = deps;
     if (!fetchImpl || !locationImpl || !protocol || !totp) {
@@ -58,6 +62,12 @@
 
     function requestId() {
       return cryptoImpl?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    async function report(message, stage) {
+      const currentTaskId = String(message?.taskId || '').trim();
+      if (!currentTaskId) return;
+      await reportProgress({ taskId: currentTaskId, stage }).catch(() => {});
     }
 
     async function requestJson(path, options = {}) {
@@ -170,7 +180,9 @@
       if (!password) {
         throw new BridgeError('账号密码为空', 'password_missing');
       }
+      await report(message, 'password_verifying');
       let payload = await authStep('/api/accounts/password/verify', { password });
+      await report(message, 'password_verified');
       let mfaVerified = false;
 
       if (protocol.isMfaChallenge(payload)) {
@@ -182,6 +194,7 @@
         if (!secret) {
           throw new BridgeError('账号缺少 2FA 密钥', 'totp_missing');
         }
+        await report(message, 'totp_challenge');
         await authStep('/api/accounts/mfa/issue_challenge', {
           type: 'totp',
           id: factor.id,
@@ -201,6 +214,9 @@
           code,
         });
         mfaVerified = true;
+        await report(message, 'totp_verified');
+      } else {
+        await report(message, 'totp_skipped');
       }
 
       if (protocol.isWorkspaceSelection(payload)) {
@@ -208,15 +224,20 @@
         if (!workspaceId) {
           throw new BridgeError('登录响应中没有可选择的工作空间', 'workspace_missing');
         }
+        await report(message, 'workspace_selecting');
         payload = await authStep('/api/accounts/workspace/select', {
           workspace_id: workspaceId,
         });
+        await report(message, 'workspace_selected');
+      } else {
+        await report(message, 'workspace_skipped');
       }
 
       const nextUrl = protocol.continueUrl(payload);
       if (!nextUrl) {
         throw new BridgeError('登录响应缺少完成跳转地址', 'continue_url_missing');
       }
+      await report(message, 'authorization_ready');
       return {
         continueUrl: protocol.resolveTrustedUrl(nextUrl, 'https://auth.openai.com/'),
         mfaVerified,

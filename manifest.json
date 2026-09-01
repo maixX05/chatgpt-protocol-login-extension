@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Protocol Login",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "在当前浏览器环境中通过同源协议请求登录 ChatGPT。",
-  "minimum_chrome_version": "102",
+  "minimum_chrome_version": "114",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -13,6 +13,7 @@
   "permissions": [
     "alarms",
     "cookies",
+    "sidePanel",
     "storage",
     "tabs"
   ],
@@ -26,6 +27,9 @@
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
   },
   "content_scripts": [
     {
@@ -47,7 +51,6 @@
   ],
   "action": {
     "default_title": "ChatGPT Protocol Login",
-    "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
